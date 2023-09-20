@@ -1,0 +1,135 @@
+---
+# Cloud Build Notifier Configuration
+
+# Project settings
+input:
+  # Replace with your project number
+  project_number: 1234567890
+  # Replace with your subscription ID
+  subscription_id: pubsub-sub-id
+
+# Default notification type (Slack in this case)
+output:
+  type: slack
+  params:
+    # Replace with your Slack webhook URL
+    webhook: https://hooks.slack.com/services/YYYYYYYYY/XXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Build triggers configuration
+triggers:
+  # Default configuration for all builds
+  default:
+    # Define the potential build status types
+    # If a status matches, the corresponding template will be used.
+    default: ["FAILURE", "CANCELLED", "TIMEOUT", "SUCCESS"]
+
+  # Custom build trigger(s) (optional)
+  custom:
+    # Custom trigger 1
+    - trigger_id: XXXXXXXXXXXX-YYYY-ZZZZZ-XXXX-XYZXYZXYZXYZ
+      # Specify which statuses trigger notifications and the associated template
+      status:
+        - type: ["SUCCESS", "FAILED"]
+          template: template_2
+      # Optional: Customize the output settings for this trigger
+      output:
+        type: slack
+        params:
+          secret_manager: projects/1234567890/secrets/MY_SECRET/versions/latest
+
+# Templates for Slack messages (using Rust Tera templating language)
+templates:
+  # Default Template
+  default: |
+    {
+        "blocks": [{
+            "type": "section",
+            "block_id": "section789",
+            "fields": [{
+                "type": "mrkdwn",
+                {% if event.status == "SUCCESS" -%}
+                "text": "*Cloud Build Trigger: Job Completed*"
+                {% elif event.status == "FAILURE" -%}
+                "text": "*Cloud Build Trigger: Job Failed*"
+                {% elif event.status == "CANCELLED" -%}
+                "text": "*Cloud Build Trigger: Job Cancelled*"
+                {% elif event.status == "TIMEOUT" -%}
+                "text": "*Cloud Build Trigger: Job Timed Out*"
+                {% else -%}
+                "text": "*Cloud Build Trigger*"
+                {%- endif -%}
+            }]
+        }],
+        "attachments": [{
+            {% if event.status == "SUCCESS" -%}
+            "color": "#36a64f",
+            {% elif event.status in [ "FAILURE", "CANCELLED", "TIMEOUT" ] -%}
+            "color": "#FF0000",
+            {%- endif -%}
+            "blocks": [{
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        {% if "storageSource" in event.source -%}
+                        "text": "{{ event.substitutions._BUILD_IMAGE | split(pat="/") | last }} - <{{ event.logUrl }} | View Logs>"
+                        {% else -%}
+                        "text": "{{ event.substitutions.TRIGGER_NAME }}  - <{{ event.logUrl }} | View Logs>"
+                        {% endif -%}
+                    }
+                },
+                {
+                    "type": "section",
+                    "fields": [{
+                            "type": "mrkdwn",
+                            "text": "*Completed:*\n{{ event.finishTime }}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": "*Build Time:*\n {{ buildTime }}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            {% if "storageSource" in event.source -%}
+                            "text": "*Version:*\n{{ event.substitutions._VERSION }}"
+                            {% else -%}
+                            "text": "*Branch:*\n{{ event.substitutions.BRANCH_NAME }}"
+                            {% endif -%}
+                        },
+                        {
+                            "type": "mrkdwn",
+                            {% if "storageSource" in event.source -%}
+                            "text": "*Commit:*\n{{ event.substitutions._GIT_SHA }}"
+                            {% else -%}
+                            "text": "*Commit:*\n{{ event.substitutions.COMMIT_SHA }}"
+                            {% endif -%}
+
+
+                        }
+                    ]
+                }
+            ]
+        }]
+    }
+  # Custom Template 2
+  template_2: |
+    {
+        "blocks": [{
+            "type": "section",
+            "block_id": "section789",
+            "fields": [{
+                "type": "mrkdwn",
+                "text": "*Cloud Build Trigger: Job Completed*"
+            }]
+        }],
+        "attachments": [{
+            "color": "#36a64f",
+            "blocks": [{
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "{{ event.substitutions.TRIGGER_NAME }} - <{{ event.logUrl }} | View Logs>"
+                    }
+                }
+            ]
+        }]
+    }

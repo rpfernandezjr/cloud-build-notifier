@@ -1,0 +1,6 @@
+/target
+/helm
+*.zst
+build-push.sh
+/test
+config.yaml

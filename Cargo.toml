@@ -1,0 +1,27 @@
+[package]
+name = "cloud-build-notifier"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+lto = true
+
+[dependencies]
+base64 = "0.21.4"
+clap = "3.2.11"
+chrono = "0.4.30"
+env_logger = "0.10.0"
+futures-util = "0.3.28"
+gcp_auth = "*"
+google-cloud-gax = "0.15.0"
+google-cloud-googleapis = "0.11.0"
+google-cloud-pubsub = "0.20.0"
+google-cloud-storage = "0.13.1"
+log = "0.4.20"
+reqwest = "0.11.20"
+serde = "1.0.188"
+serde_derive = "1.0"
+serde_json = "1.0.105"
+serde_yaml = "0.9.25"
+tera = "1.19.1"
+tokio = { version = "1.32.0", features = ["rt-multi-thread"] }
