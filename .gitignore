@@ -4,3 +4,4 @@
 build-push.sh
 /test
 config.yaml
+/events

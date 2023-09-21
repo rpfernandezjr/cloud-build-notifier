@@ -1,11 +1,11 @@
-use crate::config::Config;
 use crate::config::Triggers;
-use crate::gcp;
+use crate::fetch_log;
 use crate::notify;
 use crate::Error;
-use crate::Notify;
+use crate::Settings;
 use chrono::DateTime;
 use chrono::Utc;
+use regex::Regex;
 use serde_json::Value;
 use std::collections::HashMap;
 use tera::Tera;
@@ -84,35 +84,32 @@ pub fn get_build_time(event: &Value) -> String {
 pub async fn process(
     message_id: &str,
     event_str: String,
-    config: &Config,
-    notifiers: &HashMap<String, Notify>,
+    settings: &Settings,
 ) -> Result<(), Error> {
     let event = deserialize(&event_str)?;
-
+    let re = Regex::new(r"(?:\{\{[^{}]*\blog\b[^{}]*\}\}|\{%[^{}]*\blog\b[^{}]*%\})").unwrap();
     let status = event["status"].as_str().ok_or(Error::EventParsing(
         "failed to get event status".to_string(),
     ))?;
 
-    let id = event["id"]
+    let build_id = event["id"]
         .as_str()
         .ok_or(Error::EventParsing("failed to get trigger_id".to_string()))?;
 
     let trigger_id = event.get("buildTriggerId");
-
-    let bucket = format!(
-        "{}.cloudbuild-logs.googleusercontent.com",
-        config.input.project_number
-    );
-    let object = format!("log-{}.txt", id);
-
     log::info!(
         "processing message_id={} event_id={} status={}",
         message_id,
-        id,
+        build_id,
         status
     );
 
-    let template = get_template(&config.triggers, &config.templates, trigger_id, status)?;
+    let template = get_template(
+        &settings.config.triggers,
+        &settings.config.templates,
+        trigger_id,
+        status,
+    )?;
     log::debug!("message_id={} template: {}", message_id, template);
 
     let build_time = get_build_time(&event);
@@ -120,13 +117,16 @@ pub async fn process(
     context.insert("event", &event);
     context.insert("buildTime", &build_time);
 
-    match gcp::storage::download_object(bucket, object).await {
-        Ok(log) => context.insert("log", &log.to_owned()),
-        Err(_) => {
-            log::warn!("message_id={} failed to fetch logs", message_id);
-            context.insert("log", "");
-        }
-    };
+    if re.is_match(&template) {
+        match fetch_log::get_logs(&event, build_id, &settings.project).await {
+            None => log::warn!("failed to download logs for build_id={}", build_id),
+            Some(logs) => {
+                log::debug!("log={}", logs);
+                context.insert("log", &logs);
+            }
+        };
+    }
+
     log::debug!("message_id={} context: {:?}", message_id, context);
 
     let rendered = Tera::one_off(&template, &context, false).map_err(|_| {
@@ -137,12 +137,12 @@ pub async fn process(
     })?;
     log::debug!("message_id={} rendered: {}", message_id, rendered);
 
-    let mut notify = notifiers.get("default").unwrap();
+    let mut notify = settings.notifiers.get("default").unwrap();
     if let Some(Value::String(id)) = trigger_id {
-        if notifiers.contains_key(id) {
-            notify = notifiers.get(id).unwrap();
+        if settings.notifiers.contains_key(id) {
+            notify = settings.notifiers.get(id).unwrap();
         }
-     }
+    }
 
     let _ = notify::notify(notify, &rendered).await;
 

@@ -3,8 +3,8 @@
 
 # Project settings
 input:
-  # Replace with your project number
-  project_number: 1234567890
+  # Replace with your GCP project name
+  project: my-gcp-project
   # Replace with your subscription ID
   subscription_id: pubsub-sub-id
 
