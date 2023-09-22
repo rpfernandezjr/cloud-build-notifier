@@ -4,6 +4,9 @@ Cloud Build Notifier is a tool that sends alerts when the state of a Google Clou
 # Installation
 To use this app, make sure you have [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) installed.
 
+# GCP Auth
+This app honors `GOOGLE_APPLICATION_CREDENTIALS`, if that is not set, it attempts to auth using the Application Default Credentials, if that is not found it attempts to auth with the google metadata server.
+
 ## Configuration
 
 Before using Cloud Build Notifier, you need to configure it by following these steps:
@@ -20,8 +23,6 @@ gcloud pubsub subscriptions create subscriber-id \
 ```
 
 ## Notification Types
-Currently just Slack is supported.
-
 
 ### Slack Integration
 
@@ -35,6 +36,16 @@ output:
     secret_manager: projects/1234567890/secrets/MY_SECRET/versions/latest
 ```
 Slack requires a webhook URL. You can provide it directly with the webhook key or use the secret_manager key to fetch the webhook from Google Cloud Platform. Only one of these two parameters is required.
+
+### Disable a Notification
+To disable notifications
+
+```yaml
+output:
+  type: null
+  params: {}
+```
+You can use this in the `triggers.custom[]` section to disable notifications for specific triggers.
 
 ## Templates
 
@@ -71,9 +82,6 @@ This process downloads the logs from the cloud build run and loads it into the `
 ```
 {{ log }}
 ```
-
-Note: There are some instances where the logs fail to download from GCS, I still haven't tracked down why, but just be aware if your template is dependent on it
-
 
 ## Local Development
 

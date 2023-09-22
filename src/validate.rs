@@ -1,5 +1,5 @@
-use crate::config::Config;
 use crate::event::get_build_time;
+use crate::Settings;
 use serde_json::Value;
 use std::error::Error;
 use std::fs::File;
@@ -33,7 +33,12 @@ fn is_json_valid(json_str: &str) -> bool {
     false
 }
 
-pub fn template(config: &Config, template_key: &str, event_file: &str, log_file: Option<String>) {
+pub fn template(
+    settings: &Settings,
+    template_key: &str,
+    event_file: &str,
+    log_file: Option<String>,
+) {
     let event = match load_json_file(event_file) {
         Ok(v) => v,
         Err(e) => {
@@ -42,8 +47,8 @@ pub fn template(config: &Config, template_key: &str, event_file: &str, log_file:
         }
     };
 
-    let template = match config.templates.contains_key(template_key) {
-        true => config.templates.get(template_key).unwrap(),
+    let template = match settings.config.templates.contains_key(template_key) {
+        true => settings.config.templates.get(template_key).unwrap(),
         false => {
             log::error!("template key={} not found in config", template_key);
             exit(1);

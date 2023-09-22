@@ -6,7 +6,7 @@ use std::io::prelude::*;
 
 #[derive(Debug, Deserialize)]
 pub struct Input {
-    pub project_number: String,
+    pub project: String,
     pub subscription_id: String,
 }
 

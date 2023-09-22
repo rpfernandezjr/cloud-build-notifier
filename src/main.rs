@@ -9,21 +9,19 @@ use cloud_build_notifier::Error::EventParsing;
 use cloud_build_notifier::Error::SlackNotify;
 use cloud_build_notifier::Error::TemplateNotSet;
 use cloud_build_notifier::Error::TemplateRender;
-use cloud_build_notifier::Notify;
+use cloud_build_notifier::Settings;
 use env_logger::Builder;
 use env_logger::Env;
 use futures_util::StreamExt;
 use google_cloud_pubsub::subscription::MessageStream;
-use std::collections::HashMap;
 use std::process::exit;
 
 async fn run(
     mut consumer: MessageStream,
-    config: &config::Config,
-    notifiers: &HashMap<String, Notify>,
+    settings: &Settings,
     nack: bool,
 ) {
-    log::info!("listening for messages on {}", config.input.subscription_id);
+    log::info!("listening for messages on {}", settings.config.input.subscription_id);
 
     while let Some(message) = consumer.next().await {
         let id = &message.ack_id().to_string()[0..10];
@@ -31,14 +29,14 @@ async fn run(
         let data = String::from_utf8_lossy(bytes).to_string();
         log::debug!("message_id={} data={}", id, data);
 
-        if let Err(error) = event::process(id, data, config, notifiers).await {
+        if let Err(error) = event::process(id, data, settings).await {
             match error {
                 Deserialize(e) | TemplateRender(e) | SlackNotify(e) | EventParsing(e) => {
                     log::error!("message_id={} error={}", id, e);
                 }
                 TemplateNotSet(e) => {
                     log::info!("message_id={} msg={}", id, e);
-                },
+                }
             }
         } else {
             log::info!("message_id={} has been processed", id);
@@ -76,7 +74,16 @@ async fn main() {
         }
     };
 
+    let project = gcp::project::get(&config.input.project).await;
+
     let notifiers = notify::load_outputs(&config.output, &config.triggers.custom).await;
+
+    let settings = Settings {
+        config,
+        notifiers,
+        project,
+    };
+    log::debug!("{:?}", settings);
 
     if options.is_present("validate") {
         let template_key = options
@@ -97,14 +104,15 @@ async fn main() {
 
         let log_file = options.value_of("log-file").map(|v| v.to_string());
 
-        validate::template(&config, template_key, event_file, log_file);
+        validate::template(&settings, template_key, event_file, log_file);
     } else {
         let nack = options.is_present("nack");
 
-        let consumer = gcp::pubsub::get_consumer(&config.input.subscription_id)
+        let consumer = gcp::pubsub::get_consumer(&settings.config.input.subscription_id)
             .await
             .unwrap();
 
-        run(consumer, &config, &notifiers, nack).await;
+        run(consumer, &settings, nack).await;
     }
+
 }

@@ -325,6 +325,7 @@ dependencies = [
  "google-cloud-pubsub",
  "google-cloud-storage",
  "log",
+ "regex",
  "reqwest",
  "serde",
  "serde_derive",
