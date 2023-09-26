@@ -81,12 +81,30 @@ pub fn get_build_time(event: &Value) -> String {
     String::from("Build time not available")
 }
 
+pub async fn process_on_error(
+    event_str: &str,
+    error: &str,
+    settings: &Settings,
+) {
+    if settings.config.templates.contains_key("on_error") {
+        let event = deserialize(&event_str).unwrap();
+        let notify = settings.notifiers.get("default").unwrap();
+        let template = settings.config.templates.get("on_error").unwrap();
+        let mut context = tera::Context::new();
+        context.insert("event", &event);
+        context.insert("error", error);
+
+        let rendered = Tera::one_off(&template, &context, false).unwrap();
+        let _ = notify::notify(notify, &rendered).await;
+    }
+}
+
 pub async fn process(
     message_id: &str,
-    event_str: String,
+    event_str: &str,
     settings: &Settings,
 ) -> Result<(), Error> {
-    let event = deserialize(&event_str)?;
+    let event = deserialize(event_str)?;
     let re = Regex::new(r"(?:\{\{[^{}]*\blog\b[^{}]*\}\}|\{%[^{}]*\blog\b[^{}]*%\})").unwrap();
     let status = event["status"].as_str().ok_or(Error::EventParsing(
         "failed to get event status".to_string(),

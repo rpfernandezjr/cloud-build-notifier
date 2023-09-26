@@ -29,10 +29,11 @@ async fn run(
         let data = String::from_utf8_lossy(bytes).to_string();
         log::debug!("message_id={} data={}", id, data);
 
-        if let Err(error) = event::process(id, data, settings).await {
+        if let Err(error) = event::process(id, &data, settings).await {
             match error {
                 Deserialize(e) | TemplateRender(e) | SlackNotify(e) | EventParsing(e) => {
                     log::error!("message_id={} error={}", id, e);
+                    event::process_on_error(&data, &e, settings).await;
                 }
                 TemplateNotSet(e) => {
                     log::info!("message_id={} msg={}", id, e);
