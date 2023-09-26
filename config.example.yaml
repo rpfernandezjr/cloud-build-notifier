@@ -133,3 +133,51 @@ templates:
             ]
         }]
     }
+  # special template that is sent to the default output type
+  # if there is an error processing the build event.
+  on_error: |
+    {
+        "blocks": [{
+            "type": "section",
+            "block_id": "section789",
+            "fields": [{
+                "type": "mrkdwn",
+                "text": "*Failed to process notification event*"
+            }]
+        }],
+        "attachments": [{
+            "color": "#FF0000",
+            "blocks": [
+                   {
+                   "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        {%- if event.id -%}
+                        "text": "*Failed to process event for build_id: {{ event.id }}*"
+                        {%- else -%}
+                        "text": "Failed to process event"
+                        {%- endif -%}
+                    }
+                }
+                {%- if error -%}
+               ,{
+                   "type": "section",
+                   "text": {
+                     "type": "mrkdwn",
+                     "text": "*Reason:* {{ error }}"
+                    }
+                }
+                {%- endif -%}
+                {%- if event.logUrl -%}
+               ,{
+                   "type": "section",
+                   "text": {
+                     "type": "mrkdwn",
+                     "text": "<{{ event.logUrl }} | View build logs>"
+                    }
+                }
+                {%- endif -%}
+            ]
+         }
+        ]
+      }
